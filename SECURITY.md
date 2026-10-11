@@ -4,22 +4,27 @@
 
 ## Reporting a vulnerability
 
-Please do not report security vulnerabilities in public issues. Use the repository host's private vulnerability reporting feature. A project-specific security contact will be added before the first public release.
+Please do not disclose suspected vulnerabilities in public issues or discussions. If GitHub private vulnerability reporting is enabled for this repository, use that mechanism to report the issue. If private reporting is unavailable, contact the maintainer through a private contact mechanism associated with the repository rather than opening a public issue. No security email address is currently published here.
 
-## Sensitive data
+Include the affected version, a description of the impact, and steps to reproduce where safe. Do not include real provider credentials, cookies, tokens, or personal conversation data in a report.
 
-Provider session partitions contain authentication state such as cookies, local storage, and IndexedDB. Treat the local NEXSUS user-data directory as sensitive. NEXSUS does not collect provider passwords, export cookies, log page contents, or transmit session state to a NEXSUS server.
+## Sensitive local data
 
-## Electron boundaries
+NEXSUS stores account metadata in a local SQLite database under Electron's `userData` directory. Persistent provider session partitions are stored under Electron's local session data directory and can contain cookies, local storage, IndexedDB, and other browser session state, including authentication state. Protect the NEXSUS data directory and device account as sensitive; do not share a profile directory or diagnostic bundle without reviewing its contents.
 
-- The local renderer has context isolation and sandboxing enabled, with Node integration disabled.
-- Remote provider pages use separate `WebContentsView` instances, persistent per-account session partitions, no preload, and no Node.js integration.
-- IPC handlers validate the sender's main frame and validate item IDs, text, navigation URLs, capsule structures, and browser bounds.
-- Provider permission requests and popup windows are denied by default; insecure HTTP navigation is rejected.
-- The local app document has a restrictive Content Security Policy and does not load remote assets.
+NEXSUS does not collect provider passwords or export provider cookies or tokens. The application has no mandatory cloud backend or telemetry. Capsule contents and source metadata are stored locally and may contain sensitive project information.
 
-NEXSUS currently uses Electron's built-in SQLite module for local metadata. Application startup failures may write technical stack details to a local diagnostic log; provider URLs, passwords, cookies, tokens, and conversation contents are not included.
+## Electron security boundaries
 
-## Scope
+- The local application window uses context isolation and sandboxing, disables Node integration, and exposes a narrow preload API to the trusted renderer.
+- Provider pages run in separate `WebContentsView` instances with per-account persistent partitions, context isolation and sandboxing enabled, Node integration disabled, and no NEXSUS preload.
+- IPC handlers validate the sender frame and validate identifiers, text, navigation URLs, Capsule structures, and browser bounds before acting.
+- Main-frame provider navigation is restricted to HTTPS provider domains and explicitly configured identity-provider hosts. Popups are allowed only for configured sign-in hosts; provider permission requests and permission checks are denied.
+- The local application document has a restrictive Content Security Policy and loads its scripts, styles, and logo from packaged local files. Provider websites are remote third-party content and remain subject to their own policies.
+- Startup failures may write the error message and stack details to a local diagnostic log. The application does not collect page contents or session data for diagnostics; review a log before sharing it because exception text can vary.
 
-The account isolation and capsule storage paths have unit and persistence tests. The managed Windows environment used to prepare the project terminates the Electron Chromium process before a window appears, so the account switching and provider login integration flow still needs verification on a normal desktop machine before release.
+## Threat model and limitations
+
+NEXSUS embeds third-party provider websites. Their authentication and security policies remain authoritative; NEXSUS does not bypass provider restrictions, CAPTCHAs, or rate limits. Provider website or DOM changes can break sign-in flows, conversation extraction, or composer insertion. The provider-specific adapters are implemented and covered by automated tests, but authenticated live extraction and injection have not been verified for the current provider pages.
+
+The Electron session integration test uses a local test page to verify persistence and isolation across eight account partitions and process restart. It does not verify live provider authentication or current provider DOM compatibility. Users should protect local session data as they would other credentials.

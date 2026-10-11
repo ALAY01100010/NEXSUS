@@ -1,94 +1,96 @@
 <!-- Made by Alay -->
 
-# NEXSUS
+# NEXSUS — All Your AI Accounts. One Workspace.
 
-**All Your AI Accounts. One Workspace.**
+NEXSUS is a local-first desktop workspace for using multiple AI provider accounts in one application, with a separate persistent browser session for each account. It uses the providers' actual websites rather than recreating their chat interfaces.
 
-NEXSUS is an open-source desktop workspace for using your existing AI provider accounts in one place. It displays the providers' actual websites and keeps each account in its own persistent browser session.
+> NEXSUS is primarily created and maintained by Alay, with the project open to community contributions.
 
-## Features
+## Providers
 
-- A dark desktop workspace with account and Context Capsule sidebars, global search, resizable sidebar, and browser controls.
-- Multiple Claude accounts, each using a separate persistent Chromium session partition.
-- Local SQLite storage for account and capsule metadata.
-- Manual Context Capsules with editing, duplication, clipboard copy, and JSON or Markdown import/export.
-- Secure IPC boundary; remote provider pages have no preload bridge, Node.js integration, or application APIs.
-- Windows, macOS, and Linux packaging targets.
+| Provider | Account sessions | Capsule adapters | Live provider verification |
+| --- | --- | --- | --- |
+| Claude | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
+| ChatGPT | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
+| Gemini | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
+| Grok | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
 
-## Screenshot
+Provider adapters inspect visible conversation DOM and insert Capsule text into provider-specific composers. Automated tests cover adapter selection, mapping, selectors, and injection behavior; those tests do not confirm compatibility with the providers' current authenticated pages. Provider site changes may require adapter updates.
 
-The first interactive product screenshot will be added after the desktop launch workflow has been verified on a supported developer machine.
+## Context Capsules
 
-## Supported providers
+Context Capsules preserve useful, provider-independent working context for a user to carry between AI sessions. A Capsule can include an objective and summary, decisions, constraints, completed work, current state, pending work and next action, technical context, conversation excerpts, source metadata, and attachment metadata.
 
-| Provider | Status |
-| --- | --- |
-| Claude | Supported at `https://claude.ai`. Multiple persistent, isolated accounts are supported. |
-| ChatGPT, Gemini, Perplexity | Not implemented yet. |
+Capsules support editing, duplication, version history and restoration, and JSON or Markdown import/export. A user can choose a target account, review the context, and explicitly inject it into that provider's composer. Injection does not send or submit the message. NEXSUS does not automatically migrate conversations between providers.
 
-NEXSUS uses the real provider website. It does not recreate a chatbot interface. Embedded sign-in flows may change when a provider updates its website; NEXSUS does not bypass provider restrictions or automate account rotation.
+## Architecture and privacy
 
-## Install
+- Electron hosts the local workspace and provider pages in `WebContentsView` instances.
+- Each account receives a distinct persistent Electron session partition; accounts do not share cookies or browser storage.
+- SQLite stores local account and Capsule metadata. Provider session data remains in local Chromium profile storage.
+- The trusted application renderer uses a narrow preload API, context isolation, sandboxing, and validated IPC. Provider pages have no NEXSUS preload or Node.js integration.
+- Provider navigation is limited to HTTPS provider and configured sign-in hosts. Popups are limited to configured authentication hosts, and provider permission requests are denied.
+- The local app uses a restrictive Content Security Policy and bundled assets. There is no mandatory cloud backend or telemetry.
 
-There are no published installers yet. Windows NSIS, macOS DMG, and Linux AppImage targets are configured for release builds.
+Users sign in on the providers' websites; NEXSUS does not collect provider passwords or export provider cookies or tokens. It does not send provider session data to a NEXSUS cloud service, use private provider APIs to bypass normal website access, rotate accounts automatically, or bypass CAPTCHAs or provider security controls. Protect the local NEXSUS data directory as sensitive authentication data.
 
-## Development
+See [SECURITY.md](SECURITY.md) for the security boundaries and vulnerability reporting guidance.
 
-Requirements: Node.js 24 or newer and pnpm 11.25.0.
+## Installation and development
+
+There are no public installers yet. Local packaging targets are configured for Windows NSIS, macOS DMG, and Linux AppImage.
+
+Development uses Node.js 24 or newer and pnpm 11.25.0. The pnpm version is declared in `package.json`; a Node.js version is not pinned there.
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-Build, type-check, and test:
+Run validation:
 
 ```sh
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:electron
 ```
 
-Create a package for the current operating system:
+Create a local package for the current operating system:
 
 ```sh
 pnpm package
 ```
 
-## Local data and privacy
+## Validation status
 
-NEXSUS has no cloud account, mandatory server, or telemetry. Application metadata is stored in `nexsus.sqlite` under Electron's local `userData` directory. Provider cookies, local storage, and other session state are stored in Chromium profile partitions in Electron's local session data directory. Those local files contain sensitive sign-in state and should be protected like credentials on the device.
+| Area | Status |
+| --- | --- |
+| Provider registry, account partitions, Capsule adapters | Implemented |
+| Typecheck, unit tests, and production build | Automated-tested |
+| Electron persistence and account isolation | Automated-tested; eight account partitions passed switching and restart checks |
+| Authenticated provider sign-in, live extraction, and live injection | Not live-verified |
 
-NEXSUS does not ask for provider passwords, copy authentication cookies, or send provider session data, conversations, or credentials to a NEXSUS service. Context Capsules are created and transferred manually by the user.
+The latest recorded checks passed: `pnpm typecheck`, `pnpm test` (33 tests), `pnpm build`, and `pnpm test:electron`. The Electron integration test exercises persistent, isolated partitions using a local test page; it is not a live provider sign-in or DOM compatibility test.
 
-## Security model
+## Project structure
 
-Electron's main process owns account metadata and browser views. The local renderer uses a narrow preload API with context isolation and sandboxing. Provider websites run in separate `WebContentsView` instances with Node integration disabled, no NEXSUS preload, HTTPS-only navigation, and separate persistent partitions. Permission requests and pop-up windows from provider pages are denied by default.
+- `src/electron/` — Electron main process, IPC validation, SQLite store, and Capsule import/export.
+- `src/providers/` — provider registry, navigation policy, and context adapters.
+- `src/renderer/` — local workspace UI and bundled brand styles.
+- `src/shared/` — shared contracts across the IPC boundary.
+- `src/assets/` — bundled official NEXSUS logo.
+- `tests/` and `scripts/` — unit and Electron session integration checks.
+- `build/icon.ico` — Windows application and installer icon source.
 
-IPC calls validate the sender frame and the received identifiers, text, URLs, and browser bounds. Logs are reserved for technical startup diagnostics and do not include page content or session data. See [SECURITY.md](SECURITY.md) for reporting guidance.
+## Screenshots
 
-## Limitations
-
-- Claude is the only configured provider in this release milestone.
-- The app has not yet been launch-verified in this managed Windows environment. Run `pnpm dev` on a regular desktop machine to exercise Electron's Chromium window.
-- Provider website changes and sign-in policies can affect embedded browsing. NEXSUS does not work around those restrictions.
-- Settings, drag-to-reorder accounts, favorites, detached windows, and broad keyboard customization remain on the roadmap.
+No product screenshot is committed yet. Screenshots will be added after the desktop UI has been visually verified on a supported machine.
 
 ## Roadmap
 
-1. Project foundation and provider registry
-2. Premium workspace interface
-3. Embedded Chromium browser workspace
-4. Claude account workflow and persistent isolated sessions
-5. Account management and fast switching
-6. Context Capsules
-7. Additional providers
-8. Security review, integration tests, and Windows release preparation
+- Live verification and ongoing maintenance of provider-specific extraction and composer adapters.
+- Broader provider and platform testing, plus public release preparation.
+- Additional contributor documentation and community contributions.
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and project principles. Read [SECURITY.md](SECURITY.md) before reporting a vulnerability.
-
-## License
-
-NEXSUS is distributed under the MIT License. See [LICENSE](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and contribution guidance. NEXSUS is distributed under the [MIT License](LICENSE).

@@ -1,25 +1,53 @@
 <!-- Made by Alay -->
 
-# Contributing
+# Contributing to NEXSUS
 
-Thanks for helping build NEXSUS. The project prioritizes reliable account isolation, user privacy, security, and a clear desktop experience.
+Thanks for your interest in contributing. NEXSUS is primarily created and maintained by Alay, and community contributions are welcome.
 
 ## Development setup
 
-- Install Node.js 24 or newer and pnpm 11.25.0.
-- Run `pnpm install` and `pnpm dev`.
-- Run `pnpm typecheck`, `pnpm test`, and `pnpm build` before submitting a change.
+- Install Node.js 24 or newer. The project does not pin a Node.js version in `package.json`; Node 24 is the current development baseline.
+- Install pnpm 11.25.0, as declared by the `packageManager` field in `package.json`.
+- Install dependencies and launch the desktop app:
+
+  ```sh
+  pnpm install
+  pnpm dev
+  ```
+
+- Before opening a pull request, run:
+
+  ```sh
+  pnpm typecheck
+  pnpm test
+  pnpm build
+  pnpm test:electron
+  ```
+
+- Build a local package with `pnpm package`. Targets are configured for Windows NSIS, macOS DMG, and Linux AppImage; public installers are not currently published.
 
 ## Project structure
 
-- `src/electron/`: privileged desktop main and preload processes.
-- `src/shared/`: structured contracts shared across the desktop boundary.
-- `src/renderer/`: local application interface.
-- `src/providers/`: provider metadata and URL policy.
-- `tests/`: database persistence, capsule format, and IPC input validation tests.
+- `src/electron/` — privileged main process, preload bridge, IPC validation, SQLite metadata store, and Capsule import/export.
+- `src/providers/` — provider registry, navigation policy, and provider-specific conversation/composer adapters.
+- `src/renderer/` — local workspace UI and styles.
+- `src/shared/` — contracts shared across the renderer and main process.
+- `src/assets/` — locally bundled NEXSUS logo.
+- `tests/` — unit, Capsule, IPC, adapter, and Electron session integration tests.
+- `scripts/` — build asset copying and Electron integration test runner.
+- `build/icon.ico` — Windows app and installer icon resource.
 
-Keep provider pages isolated from privileged application APIs. Do not add credential collection, automatic account rotation, rate-limit bypasses, or telemetry without explicit user opt-in and project review.
+## Contribution workflow
 
-## Changes
+1. Fork the repository.
+2. Create a focused branch for your change.
+3. Make a focused change and add or update tests where appropriate.
+4. Run typecheck, tests, and build; run the Electron session test when your change affects account or session behavior.
+5. Update documentation when behavior, privacy, security, or setup instructions change.
+6. Open a pull request with a clear description, motivation, and validation results.
 
-Keep pull requests focused, describe the user-visible behavior, and include tests for account, storage, provider-policy, or capsule behavior as those features are introduced. Update documentation when changing privacy or security behavior.
+Please preserve account/session isolation, local-first privacy, secure IPC, provider security boundaries, Context Capsule integrity, and existing test coverage. Provider DOM adapters are subject to website changes, so distinguish automated coverage from live provider verification in pull requests.
+
+Contributions must not collect provider passwords, export authentication cookies or tokens, bypass rate limits or CAPTCHAs, automate account rotation, circumvent provider security controls, silently add telemetry, or send user/provider data to an external backend without explicit project approval.
+
+**Primary maintainer: Alay**
