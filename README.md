@@ -10,18 +10,18 @@ NEXSUS is a local-first desktop workspace for using multiple AI provider account
 
 | Provider | Account sessions | Capsule adapters | Live provider verification |
 | --- | --- | --- | --- |
-| Claude | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
-| ChatGPT | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
-| Gemini | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
-| Grok | Multiple isolated persistent sessions | Extraction and composer injection implemented | Not verified in an authenticated live session |
+| Claude | Multiple isolated persistent sessions | Extraction and composer injection implemented | Live verified |
+| ChatGPT | Multiple isolated persistent sessions | Extraction and composer injection implemented | Live verified |
+| Gemini | Multiple isolated persistent sessions | Extraction and composer injection implemented | Live verified |
+| Grok | Multiple isolated persistent sessions | Extraction and composer injection implemented | Live verified |
 
-Provider adapters inspect visible conversation DOM and insert Capsule text into provider-specific composers. Automated tests cover adapter selection, mapping, selectors, and injection behavior; those tests do not confirm compatibility with the providers' current authenticated pages. Provider site changes may require adapter updates.
+Provider adapters inspect visible conversation DOM and insert Capsule text into provider-specific composers. Automated tests cover adapter selection, mapping, selectors, and injection behavior. These adapters have also been tested against authenticated live provider sessions. Provider website changes may require adapter updates; live verification does not guarantee compatibility with every website state or account configuration.
 
 ## Context Capsules
 
 Context Capsules preserve useful, provider-independent working context for a user to carry between AI sessions. A Capsule can include an objective and summary, decisions, constraints, completed work, current state, pending work and next action, technical context, conversation excerpts, source metadata, and attachment metadata.
 
-Capsules support editing, duplication, version history and restoration, and JSON or Markdown import/export. A user can choose a target account, review the context, and explicitly inject it into that provider's composer. Injection does not send or submit the message. NEXSUS does not automatically migrate conversations between providers.
+Capsules support editing, duplication, version history and restoration, and JSON or Markdown import/export. A user can choose a target account, review the context, and explicitly inject it into that provider's composer. The Capsule workflow has been tested through the actual provider composer workflow. Injection does not send or submit the message. NEXSUS does not automatically migrate conversations between providers.
 
 ## Architecture and privacy
 
@@ -69,9 +69,9 @@ pnpm package
 | Provider registry, account partitions, Capsule adapters | Implemented |
 | Typecheck, unit tests, and production build | Automated-tested |
 | Electron persistence and account isolation | Automated-tested; eight account partitions passed switching and restart checks |
-| Authenticated provider sign-in, live extraction, and live injection | Not live-verified |
+| Authenticated provider sign-in, live extraction, and live injection | Live verified |
 
-The latest recorded checks passed: `pnpm typecheck`, `pnpm test` (33 tests), `pnpm build`, and `pnpm test:electron`. The Electron integration test exercises persistent, isolated partitions using a local test page; it is not a live provider sign-in or DOM compatibility test.
+The latest recorded automated checks passed: `pnpm typecheck`, `pnpm test` (33 tests), `pnpm build`, and `pnpm test:electron`. The Electron integration test exercises persistent, isolated partitions using a local test page. In addition, authenticated live testing has been performed for the configured provider workflows, including conversation extraction and Capsule composer injection.
 
 ## Project structure
 
@@ -89,7 +89,7 @@ No product screenshot is committed yet. Screenshots will be added after the desk
 
 ## Roadmap
 
-- Live verification and ongoing maintenance of provider-specific extraction and composer adapters.
+- Ongoing maintenance of provider-specific extraction and composer adapters as provider websites evolve.
 - Broader provider and platform testing, plus public release preparation.
 - Additional contributor documentation and community contributions.
 
