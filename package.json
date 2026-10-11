@@ -1,0 +1,38 @@
+{
+  "name": "nexsus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local desktop workspace for your AI accounts.",
+  "author": "Alay",
+  "license": "MIT",
+  "packageManager": "pnpm@11.25.0",
+  "type": "module",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "postinstall": "install-electron",
+    "dev": "pnpm build && electron .",
+    "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json && tsc -p tsconfig.renderer.json && tsc -p tsconfig.electron.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json",
+    "start": "electron .",
+    "package": "pnpm build && electron-builder",
+    "test": "node --test",
+    "test:electron": "node scripts/electron-session-integration.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3"
+  },
+  "build": {
+    "appId": "org.nexsus.desktop",
+    "productName": "NEXSUS",
+    "directories": { "output": "release" },
+    "files": ["dist/**", "dist-electron/**", "package.json"],
+    "extraResources": [{ "from": "build/icon.ico", "to": "icon.ico" }],
+    "win": { "target": "nsis", "icon": "build/icon.ico" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
+  }
+}

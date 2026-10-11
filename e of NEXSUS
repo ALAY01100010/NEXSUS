@@ -1,0 +1,38 @@
+ .gitignore                               |   29 [32m+[m
+ CHANGELOG.md                             |   11 [32m+[m
+ CONTRIBUTING.md                          |   25 [32m+[m
+ LICENSE                                  |   21 [32m+[m
+ README.md                                |   94 [32m++[m
+ SECURITY.md                              |   25 [32m+[m
+ build/icon.ico                           |  Bin [31m0[m -> [32m103581[m bytes
+ index.html                               |   21 [32m+[m
+ package.json                             |   38 [32m+[m
+ pnpm-lock.yaml                           | 2226 [32m++++++++++++++++++++++++++++++[m
+ pnpm-workspace.yaml                      |    4 [32m+[m
+ scripts/copy-assets.mjs                  |    9 [32m+[m
+ scripts/electron-session-integration.mjs |   59 [32m+[m
+ src/assets/nexsus-logo.png               |  Bin [31m0[m -> [32m1554608[m bytes
+ src/electron/capsules.ts                 |  132 [32m++[m
+ src/electron/ipc-validation.ts           |   52 [32m+[m
+ src/electron/main.ts                     |  630 [32m+++++++++[m
+ src/electron/preload.cts                 |   55 [32m+[m
+ src/electron/store.ts                    |  334 [32m+++++[m
+ src/providers/context-adapters.ts        |  192 [32m+++[m
+ src/providers/registry.test.mjs          |   49 [32m+[m
+ src/providers/registry.ts                |   77 [32m++[m
+ src/providers/types.ts                   |   14 [32m+[m
+ src/renderer/brand.ts                    |   11 [32m+[m
+ src/renderer/env.d.ts                    |   10 [32m+[m
+ src/renderer/main.ts                     |  606 [32m++++++++[m
+ src/renderer/style.css                   |  273 [32m++++[m
+ src/shared/contracts.ts                  |  117 [32m++[m
+ tests/branding-assets.test.mjs           |   26 [32m+[m
+ tests/capsules.test.mjs                  |   66 [32m+[m
+ tests/electron-session-harness.cjs       |   93 [32m++[m
+ tests/ipc-validation.test.mjs            |   42 [32m+[m
+ tests/provider-adapters.test.mjs         |   76 [32m+[m
+ tests/store.test.mjs                     |  138 [32m++[m
+ tsconfig.app.json                        |   20 [32m+[m
+ tsconfig.electron.json                   |   18 [32m+[m
+ tsconfig.renderer.json                   |   21 [32m+[m
+ 37 files changed, 5614 insertions(+)
