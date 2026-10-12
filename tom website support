@@ -1,0 +1,14 @@
+ README.md                                |  14 [32m++[m[31m--[m
+ SECURITY.md                              |   5 [32m+[m[31m-[m
+ scripts/electron-session-integration.mjs |   2 [32m+[m[31m-[m
+ src/electron/custom-websites.ts          | 108 [32m+++++++++++++++++++++++++++++++[m
+ src/electron/main.ts                     |  91 [32m++++++++++++++++++[m[31m--------[m
+ src/electron/preload.cts                 |   2 [32m+[m
+ src/electron/store.ts                    |  59 [32m+++++++++++++[m[31m----[m
+ src/renderer/main.ts                     |  37 [32m+++++++++[m[31m--[m
+ src/renderer/style.css                   |   2 [32m+[m
+ src/shared/contracts.ts                  |   6 [32m++[m
+ tests/custom-websites.test.mjs           |  62 [32m++++++++++++++++++[m
+ tests/electron-session-harness.cjs       |   2 [32m+[m
+ tests/store.test.mjs                     |  41 [32m+++++++++++[m[31m-[m
+ 13 files changed, 377 insertions(+), 54 deletions(-)
