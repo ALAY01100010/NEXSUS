@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Account, Capsule, CapsuleInput } from '../shared/contracts.js';
 import { getProvider } from '../providers/registry.ts';
+import { customWebsiteDisplayName, normalizeCustomWebsiteUrl } from './custom-websites.ts';
 
-const schemaVersion = 3;
+const schemaVersion = 5;
 
 export class LocalStore {
   private readonly database: DatabaseSync;
@@ -36,6 +37,11 @@ export class LocalStore {
       `);
       this.database.exec('PRAGMA user_version = 1;');
       this.ensureColumn('accounts', 'last_url', 'TEXT');
+      this.ensureColumn('accounts', 'account_type', "TEXT NOT NULL DEFAULT 'provider'");
+      this.ensureColumn('accounts', 'custom_url', 'TEXT');
+      this.ensureColumn('accounts', 'favicon_data_url', 'TEXT');
+      this.ensureColumn('accounts', 'updated_at', 'TEXT');
+      this.database.exec('UPDATE accounts SET updated_at = created_at WHERE updated_at IS NULL;');
       this.ensureColumn('capsules', 'technical_context_json', "TEXT NOT NULL DEFAULT '{}' ");
       this.ensureColumn('capsules', 'files_json', "TEXT NOT NULL DEFAULT '[]'");
       this.ensureColumn('capsules', 'conversation_excerpt', "TEXT NOT NULL DEFAULT ''");
@@ -62,11 +68,14 @@ export class LocalStore {
   listAccounts(): Account[] {
     const rows = this.database.prepare('SELECT * FROM accounts ORDER BY is_favorite DESC, provider_id ASC, sort_order ASC, created_at ASC, id ASC').all() as unknown as AccountRow[];
     return rows.flatMap((row) => {
+      const isCustom = row.account_type === 'custom';
       const provider = getProvider(row.provider_id);
-      if (!provider || typeof row.id !== 'string' || typeof row.display_name !== 'string') return [];
+      if ((!isCustom && !provider) || typeof row.id !== 'string' || typeof row.display_name !== 'string') return [];
       return [{
-        id: row.id, providerId: row.provider_id, providerName: provider.name, displayName: row.display_name,
-        createdAt: row.created_at, lastUsedAt: row.last_used_at, lastUrl: row.last_url ?? null,
+        id: row.id, type: isCustom ? 'custom' : 'provider', providerId: row.provider_id,
+        providerName: isCustom ? 'Custom websites' : provider!.name, displayName: row.display_name,
+        createdAt: row.created_at, updatedAt: row.updated_at ?? row.created_at, lastUsedAt: row.last_used_at, lastUrl: row.last_url ?? null,
+        customUrl: row.custom_url ?? null, faviconDataUrl: row.favicon_data_url ?? null,
         isFavorite: row.is_favorite === 1, sortOrder: row.sort_order,
       }];
     });
@@ -78,21 +87,43 @@ export class LocalStore {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
     const nextOrder = this.database.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM accounts WHERE provider_id = ?').get(providerId) as { next_order: number };
-    this.database.prepare(`INSERT INTO accounts (id, provider_id, display_name, session_partition, created_at, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?)`).run(id, providerId, cleanName, `persist:nexsus-account-${id}`, createdAt, nextOrder.next_order);
+    this.database.prepare(`INSERT INTO accounts (id, provider_id, display_name, session_partition, created_at, updated_at, sort_order, account_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'provider')`).run(id, providerId, cleanName, `persist:nexsus-account-${id}`, createdAt, createdAt, nextOrder.next_order);
     const account = this.listAccounts().find((item) => item.id === id);
     if (!account) throw new Error('The account could not be created.');
     return account;
   }
 
+  createCustomWebsite(name: string, rawUrl: string): Account {
+    const url = normalizeCustomWebsiteUrl(rawUrl);
+    const hostName = customWebsiteDisplayName(new URL(url).hostname);
+    const baseName = name.trim() ? validateText(name, 'Website name', 60) : hostName;
+    const accountNumber = Number((this.database.prepare("SELECT COUNT(*) AS count FROM accounts WHERE account_type = 'custom' AND custom_url = ?").get(url) as { count: number }).count) + 1;
+    const cleanName = `${baseName} — Account ${accountNumber}`.slice(0, 60);
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const nextOrder = this.database.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM accounts WHERE provider_id = 'custom'").get() as { next_order: number };
+    this.database.prepare(`INSERT INTO accounts (id, provider_id, display_name, session_partition, created_at, updated_at, sort_order, account_type, custom_url, last_url)
+      VALUES (?, 'custom', ?, ?, ?, ?, ?, 'custom', ?, ?)`).run(id, cleanName, `persist:nexsus-custom-${id}`, createdAt, createdAt, nextOrder.next_order, url, url);
+    const account = this.accountById(id);
+    if (!account) throw new Error('The custom website could not be created.');
+    return account;
+  }
+
+  setCustomWebsiteFavicon(id: string, dataUrl: string | null): void {
+    if (dataUrl !== null && (!/^data:image\/(?:png|jpeg|gif|x-icon);base64,[A-Za-z0-9+/]+=*$/.test(dataUrl) || dataUrl.length > 360_000)) throw new Error('The website icon is invalid.');
+    const result = this.database.prepare("UPDATE accounts SET favicon_data_url = ?, updated_at = ? WHERE id = ? AND account_type = 'custom'").run(dataUrl, new Date().toISOString(), id);
+    if (Number(result.changes) === 0) throw new Error('This custom website no longer exists.');
+  }
+
   renameAccount(id: string, displayName: string): Account {
-    const result = this.database.prepare('UPDATE accounts SET display_name = ? WHERE id = ?').run(validateText(displayName, 'Account name', 60), id);
+    const result = this.database.prepare('UPDATE accounts SET display_name = ?, updated_at = ? WHERE id = ?').run(validateText(displayName, 'Account name', 60), new Date().toISOString(), id);
     if (Number(result.changes) === 0) throw new Error('This account no longer exists.');
     return this.accountById(id)!;
   }
 
   setAccountFavorite(id: string, isFavorite: boolean): Account {
-    const result = this.database.prepare('UPDATE accounts SET is_favorite = ? WHERE id = ?').run(isFavorite ? 1 : 0, id);
+    const result = this.database.prepare('UPDATE accounts SET is_favorite = ?, updated_at = ? WHERE id = ?').run(isFavorite ? 1 : 0, new Date().toISOString(), id);
     if (Number(result.changes) === 0) throw new Error('This account no longer exists.');
     return this.accountById(id)!;
   }
@@ -106,8 +137,9 @@ export class LocalStore {
       const currentIndex = neighbors.findIndex((account) => account.id === id);
       const target = neighbors[currentIndex + direction];
       if (target) {
-        this.database.prepare('UPDATE accounts SET sort_order = ? WHERE id = ?').run(target.sort_order, id);
-        this.database.prepare('UPDATE accounts SET sort_order = ? WHERE id = ?').run(current.sort_order, target.id);
+        const updatedAt = new Date().toISOString();
+        this.database.prepare('UPDATE accounts SET sort_order = ?, updated_at = ? WHERE id = ?').run(target.sort_order, updatedAt, id);
+        this.database.prepare('UPDATE accounts SET sort_order = ?, updated_at = ? WHERE id = ?').run(current.sort_order, updatedAt, target.id);
       }
       this.database.exec('COMMIT;');
     } catch (error) {
@@ -136,11 +168,12 @@ export class LocalStore {
   }
 
   setAccountLastUrl(id: string, url: string): void {
-    this.database.prepare('UPDATE accounts SET last_url = ? WHERE id = ?').run(url, id);
+    this.database.prepare('UPDATE accounts SET last_url = ?, updated_at = ? WHERE id = ?').run(url, new Date().toISOString(), id);
   }
 
   markAccountUsed(id: string): void {
-    const result = this.database.prepare('UPDATE accounts SET last_used_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+    const now = new Date().toISOString();
+    const result = this.database.prepare('UPDATE accounts SET last_used_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
     if (Number(result.changes) === 0) throw new Error('This account no longer exists.');
     this.setActiveAccountId(id);
   }
@@ -311,7 +344,7 @@ function validateList(value: unknown, label: string): string[] {
   return items;
 }
 
-interface AccountRow { id: string; provider_id: string; display_name: string; created_at: string; last_used_at: string | null; is_favorite: number; sort_order: number; last_url: string | null; }
+interface AccountRow { id: string; provider_id: string; account_type: string; custom_url: string | null; favicon_data_url: string | null; display_name: string; created_at: string; updated_at: string | null; last_used_at: string | null; is_favorite: number; sort_order: number; last_url: string | null; }
 interface CapsuleRow { id: string; title: string; objective: string; summary: string; current_state: string; decisions_json: string; constraints_json: string; completed_json: string; pending_json: string; next_action: string; created_at: string; updated_at: string; technical_context_json: string; files_json: string; conversation_excerpt: string; version_group_id: string | null; version_number: number; is_current: number; source_json: string; attachments_json: string; }
 function parseJson<T>(source: string, fallback: T, valid: (value: unknown) => value is T): T {
   try { const value: unknown = JSON.parse(source); return valid(value) ? value : fallback; } catch { return fallback; }

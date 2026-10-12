@@ -11,6 +11,7 @@ import { getProviderAdapter } from '../providers/context-adapters.js';
 import { LocalStore } from './store.js';
 import { parseCapsuleDocument, toCapsuleDocument, toCapsuleMarkdown } from './capsules.js';
 import { validateBrowserBounds, validateCapsule, validateId, validateProviderNavigation, validateText } from './ipc-validation.js';
+import { fetchCustomWebsiteFavicon, normalizeCustomWebsiteUrl, validateCustomWebsiteNavigation } from './custom-websites.js';
 
 const maxWarmViews = 3;
 let mainWindow: BrowserWindow | null = null;
@@ -23,7 +24,7 @@ let lastBrowserBounds: { x: number; y: number; width: number; height: number } |
 const accountViews = new Map<string, WebContentsView>();
 const warmOrder: string[] = [];
 const configuredSessions = new WeakSet<Session>();
-const providerContexts = new Map<number, { accountId: string; provider: NonNullable<ReturnType<typeof getProvider>>; session: Session }>();
+const providerContexts = new Map<number, { accountId: string; provider: NonNullable<ReturnType<typeof getProvider>> | null; session: Session }>();
 const providerAuthWindows = new Map<string, Set<BrowserWindow>>();
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -38,7 +39,7 @@ else app.on('second-instance', () => {
 app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(({ url }) => {
     const context = providerContexts.get(contents.id);
-    if (!context || !isProviderAuthUrlAllowed(context.provider, url)) return { action: 'deny' };
+    if (!context?.provider || !isProviderAuthUrlAllowed(context.provider, url)) return { action: 'deny' };
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
@@ -51,7 +52,7 @@ app.on('web-contents-created', (_event, contents) => {
   });
   contents.on('did-create-window', (popup, details) => {
     const context = providerContexts.get(contents.id);
-    if (!context || !isProviderAuthUrlAllowed(context.provider, details.url)) {
+    if (!context?.provider || !isProviderAuthUrlAllowed(context.provider, details.url)) {
       popup.close();
       return;
     }
@@ -71,18 +72,15 @@ app.on('web-contents-created', (_event, contents) => {
       if (url !== trustedRendererUrl()) event.preventDefault();
       return;
     }
-    const provider = providerForContents(contents);
-    if (!provider || !isProviderNavigationAllowed(provider, url)) event.preventDefault();
+    if (!isAccountNavigationAllowed(contents, url)) event.preventDefault();
   });
   contents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     if (!isMainFrame || contents === mainWindow?.webContents) return;
-    const provider = providerForContents(contents);
-    if (!provider || !isProviderNavigationAllowed(provider, url)) event.preventDefault();
+    if (!isAccountNavigationAllowed(contents, url)) event.preventDefault();
   });
   contents.on('will-frame-navigate', (details) => {
     if (!details.isMainFrame || contents === mainWindow?.webContents) return;
-    const provider = providerForContents(contents);
-    if (!provider || !isProviderNavigationAllowed(provider, details.url)) details.preventDefault();
+    if (!isAccountNavigationAllowed(contents, details.url)) details.preventDefault();
   });
 });
 
@@ -145,9 +143,9 @@ function configureSession(providerSession: Session): void {
 function getOrCreateAccountView(account: Account): WebContentsView {
   const existing = accountViews.get(account.id);
   if (existing && !existing.webContents.isDestroyed()) return existing;
-  const provider = getProvider(account.providerId);
-  if (!provider) throw new Error('This account uses a provider that is not available in this version.');
-  const partition = `persist:nexsus-account-${account.id}`;
+  const provider = account.type === 'custom' ? null : getProvider(account.providerId);
+  if (account.type === 'provider' && !provider) throw new Error('This account uses a provider that is not available in this version.');
+  const partition = store.getAccountSessionPartition(account.id);
   const providerSession = session.fromPartition(partition);
   configureSession(providerSession);
   const view = new WebContentsView({
@@ -159,24 +157,24 @@ function getOrCreateAccountView(account: Account): WebContentsView {
       webSecurity: true,
     },
   });
-  providerContexts.set(view.webContents.id, { accountId: account.id, provider, session: providerSession });
+  providerContexts.set(view.webContents.id, { accountId: account.id, provider: provider ?? null, session: providerSession });
   if (lastBrowserBounds) view.setBounds(lastBrowserBounds);
   view.setVisible(false);
   recoveringActiveView = false;
   view.webContents.on('did-start-loading', () => sendBrowserState());
   view.webContents.on('did-stop-loading', () => sendBrowserState());
   const rememberUrl = (_event: unknown, url: string) => {
-    if (isProviderUrlAllowed(provider, url)) store.setAccountLastUrl(account.id, url);
+    if (isAccountUrlAllowed(account, url)) store.setAccountLastUrl(account.id, url);
     sendBrowserState();
   };
   view.webContents.on('did-navigate', rememberUrl);
   view.webContents.on('did-navigate-in-page', rememberUrl);
   view.webContents.on('page-title-updated', () => sendBrowserState());
   view.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, _validatedUrl, isMainFrame) => {
-    if (isMainFrame && errorCode !== -3 && activeAccountId === account.id) sendBrowserState(`The ${provider.name} page could not be loaded. Check your internet connection or try again.`, false);
+    if (isMainFrame && errorCode !== -3 && activeAccountId === account.id) sendBrowserState(`The ${account.displayName} page could not be loaded. Check your internet connection or try again.`, false);
   });
-  view.webContents.on('render-process-gone', () => markProviderViewUnresponsive(account.id, view, provider.name));
-  view.webContents.on('unresponsive', () => markProviderViewUnresponsive(account.id, view, provider.name));
+  view.webContents.on('render-process-gone', () => markProviderViewUnresponsive(account.id, view, account.displayName));
+  view.webContents.on('unresponsive', () => markProviderViewUnresponsive(account.id, view, account.displayName));
   view.webContents.on('responsive', () => {
     if (activeView !== view || activeAccountId !== account.id) return;
     recoveringActiveView = false;
@@ -190,15 +188,30 @@ function getOrCreateAccountView(account: Account): WebContentsView {
   mainWindow?.contentView.addChildView(view);
   accountViews.set(account.id, view);
   warmOrder.push(account.id);
-  const initialUrl = account.lastUrl && isProviderUrlAllowed(provider, account.lastUrl) ? account.lastUrl : provider.homepage;
+  const initialUrl = account.type === 'custom'
+    ? (account.lastUrl && isAccountUrlAllowed(account, account.lastUrl) ? account.lastUrl : account.customUrl!)
+    : (account.lastUrl && provider && isProviderUrlAllowed(provider, account.lastUrl) ? account.lastUrl : provider!.homepage);
   void view.webContents.loadURL(initialUrl);
   return view;
 }
 
-function providerForContents(contents: Electron.WebContents) {
+function accountForContents(contents: Electron.WebContents): Account | undefined {
   const context = providerContexts.get(contents.id);
-  if (!context || !store?.listAccounts().some((item) => item.id === context.accountId)) return undefined;
-  return context.provider;
+  if (!context) return undefined;
+  return store?.listAccounts().find((item) => item.id === context.accountId);
+}
+
+function isAccountUrlAllowed(account: Account, url: string): boolean {
+  if (account.type === 'custom') {
+    try { return new URL(url).protocol === 'https:'; } catch { return false; }
+  }
+  const provider = getProvider(account.providerId);
+  return Boolean(provider && isProviderNavigationAllowed(provider, url));
+}
+
+function isAccountNavigationAllowed(contents: Electron.WebContents, url: string): boolean {
+  const account = accountForContents(contents);
+  return Boolean(account && isAccountUrlAllowed(account, url));
 }
 
 function activateAccount(accountId: string): void {
@@ -327,9 +340,14 @@ function sendBrowserState(error: string | null = null, recoveryAvailable = false
 
 function validateForActiveProvider(raw: unknown): string {
   const account = store.listAccounts().find((item) => item.id === activeAccountId);
+  if (account?.type === 'custom') return validateCustomNavigation(raw);
   const provider = account ? getProvider(account.providerId) : undefined;
   if (!provider) throw new Error('Choose an account before navigating.');
   return validateProviderNavigation(raw, provider);
+}
+
+function validateCustomNavigation(raw: unknown): string {
+  return validateCustomWebsiteNavigation(raw);
 }
 
 function listen(channel: string, handler: (event: IpcMainEvent, ...args: unknown[]) => void): void {
@@ -377,6 +395,20 @@ function registerIpc(): void {
     emit('accounts:changed');
     return account;
   });
+  handle('custom-websites:create', (name, rawUrl) => {
+    const account = store.createCustomWebsite(typeof name === 'string' ? name : '', normalizeCustomWebsiteUrl(rawUrl));
+    void refreshCustomWebsiteIcon(account.id, account.customUrl!);
+    emit('accounts:changed');
+    return account;
+  });
+  handle('custom-websites:refresh-icon', async (id) => {
+    const accountId = validateId(id);
+    const account = store.listAccounts().find((item) => item.id === accountId && item.type === 'custom');
+    if (!account?.customUrl) throw new Error('This custom website no longer exists.');
+    const iconDataUrl = await fetchCustomWebsiteFavicon(account.customUrl);
+    store.setCustomWebsiteFavicon(accountId, iconDataUrl);
+    emit('accounts:changed');
+  });
   handle('accounts:rename', (id, displayName) => {
     const account = store.renameAccount(validateId(id), validateText(displayName, 'Account name', 60));
     emit('accounts:changed');
@@ -418,8 +450,8 @@ function registerIpc(): void {
     const accountId = validateId(id);
     const account = store.listAccounts().find((item) => item.id === accountId);
     if (!account) throw new Error('This account no longer exists.');
-    const provider = getProvider(account.providerId);
-    if (!provider) throw new Error('This account uses a provider that is not available in this version.');
+    const provider = account.type === 'custom' ? null : getProvider(account.providerId);
+    if (account.type === 'provider' && !provider) throw new Error('This account uses a provider that is not available in this version.');
     const providerSession = session.fromPartition(store.getAccountSessionPartition(accountId));
     const wasActive = activeAccountId === accountId;
     destroyAccountView(accountId);
@@ -427,7 +459,7 @@ function registerIpc(): void {
       await providerSession.clearStorageData();
       await providerSession.clearCache();
       providerSession.flushStorageData();
-      store.setAccountLastUrl(accountId, provider.homepage);
+      store.setAccountLastUrl(accountId, account.type === 'custom' ? account.customUrl! : provider!.homepage);
     } finally {
       recoveringActiveView = false;
       if (wasActive) {
@@ -564,8 +596,7 @@ function registerIpc(): void {
     const url = activeView?.webContents.getURL();
     if (url && activeAccountId) {
       const account = store.listAccounts().find((item) => item.id === activeAccountId);
-      const provider = account ? getProvider(account.providerId) : undefined;
-      if (provider && isProviderUrlAllowed(provider, url)) void shell.openExternal(url);
+      if (account && isAccountUrlAllowed(account, url)) void shell.openExternal(url);
     }
   });
   listen('browser:overlay', (_event, value) => {
@@ -583,6 +614,14 @@ function registerIpc(): void {
   });
 
   listen('browser:reload', () => recoverActiveView());
+}
+
+async function refreshCustomWebsiteIcon(id: string, url: string): Promise<void> {
+  const iconDataUrl = await fetchCustomWebsiteFavicon(url);
+  try {
+    store.setCustomWebsiteFavicon(id, iconDataUrl);
+    emit('accounts:changed');
+  } catch { /* The account may have been deleted while its icon was loading. */ }
 }
 
 let shutdownStarted = false;

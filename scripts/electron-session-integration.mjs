@@ -53,7 +53,7 @@ try {
   testPort = await getAvailablePort();
   run('write');
   run('restart');
-  process.stdout.write('Eight Claude, ChatGPT, Gemini, and Grok account partitions remained distinct across switches and application restart.\n');
+  process.stdout.write('Eight provider and two custom website account partitions remained distinct across switches and application restart.\n');
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });
 }

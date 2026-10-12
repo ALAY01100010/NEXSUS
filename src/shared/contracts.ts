@@ -1,12 +1,16 @@
 // Made by Alay
 export interface Account {
   id: string;
+  type: 'provider' | 'custom';
   providerId: string;
   providerName: string;
   displayName: string;
   createdAt: string;
+  updatedAt: string;
   lastUsedAt: string | null;
   lastUrl: string | null;
+  customUrl: string | null;
+  faviconDataUrl: string | null;
   isFavorite: boolean;
   sortOrder: number;
 }
@@ -78,6 +82,8 @@ export interface NexsusApi {
   accounts: {
     list(): Promise<Account[]>;
     create(providerId: string, displayName: string): Promise<Account>;
+    createCustomWebsite(name: string, url: string): Promise<Account>;
+    refreshCustomWebsiteIcon(id: string): Promise<void>;
     rename(id: string, displayName: string): Promise<Account>;
     remove(id: string): Promise<void>;
     activate(id: string): Promise<void>;

@@ -23,13 +23,17 @@ Context Capsules preserve useful, provider-independent working context for a use
 
 Capsules support editing, duplication, version history and restoration, and JSON or Markdown import/export. A user can choose a target account, review the context, and explicitly inject it into that provider's composer. The Capsule workflow has been tested through the actual provider composer workflow. Injection does not send or submit the message. NEXSUS does not automatically migrate conversations between providers.
 
+## Custom Websites
+
+NEXSUS allows users to add arbitrary HTTPS websites as custom workspaces. Each custom website entry gets its own persistent isolated browser session, and NEXSUS attempts to cache a supported favicon locally. Custom websites are arbitrary remote content and do not automatically receive provider-specific Capsule extraction or injection support. NEXSUS does not collect website credentials.
+
 ## Architecture and privacy
 
 - Electron hosts the local workspace and provider pages in `WebContentsView` instances.
 - Each account receives a distinct persistent Electron session partition; accounts do not share cookies or browser storage.
-- SQLite stores local account and Capsule metadata. Provider session data remains in local Chromium profile storage.
-- The trusted application renderer uses a narrow preload API, context isolation, sandboxing, and validated IPC. Provider pages have no NEXSUS preload or Node.js integration.
-- Provider navigation is limited to HTTPS provider and configured sign-in hosts. Popups are limited to configured authentication hosts, and provider permission requests are denied.
+- SQLite stores local account metadata, Capsule data, custom website URLs, and cached favicons. Provider and custom website session data remains in local Chromium profile storage.
+- The trusted application renderer uses a narrow preload API, context isolation, sandboxing, and validated IPC. Remote provider and custom website pages have no NEXSUS preload or Node.js integration.
+- Provider navigation is limited to HTTPS provider and configured sign-in hosts. Custom website views permit HTTPS remote navigation, deny popups, and deny permission requests.
 - The local app uses a restrictive Content Security Policy and bundled assets. There is no mandatory cloud backend or telemetry.
 
 Users sign in on the providers' websites; NEXSUS does not collect provider passwords or export provider cookies or tokens. It does not send provider session data to a NEXSUS cloud service, use private provider APIs to bypass normal website access, rotate accounts automatically, or bypass CAPTCHAs or provider security controls. Protect the local NEXSUS data directory as sensitive authentication data.
@@ -68,10 +72,10 @@ pnpm package
 | --- | --- |
 | Provider registry, account partitions, Capsule adapters | Implemented |
 | Typecheck, unit tests, and production build | Automated-tested |
-| Electron persistence and account isolation | Automated-tested; eight account partitions passed switching and restart checks |
+| Electron persistence and account isolation | Automated-tested; eight provider and two custom website partitions passed switching and restart checks |
 | Authenticated provider sign-in, live extraction, and live injection | Live verified |
 
-The latest recorded automated checks passed: `pnpm typecheck`, `pnpm test` (33 tests), `pnpm build`, and `pnpm test:electron`. The Electron integration test exercises persistent, isolated partitions using a local test page. In addition, authenticated live testing has been performed for the configured provider workflows, including conversation extraction and Capsule composer injection.
+The latest recorded automated checks passed: `pnpm typecheck`, `pnpm test` (39 tests), `pnpm build`, and `pnpm test:electron`. The Electron integration test exercises persistent, isolated partitions using a local test page. In addition, authenticated live testing has been performed for the configured provider workflows, including conversation extraction and Capsule composer injection.
 
 ## Project structure
 

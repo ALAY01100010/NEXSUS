@@ -20,6 +20,7 @@ root.innerHTML = `
         <div class="section-heading"><span>ACCOUNTS</span><button class="icon-button small" id="add-account" aria-label="Add account">${icon('plus')}</button></div>
         <div id="account-list" class="account-list"></div>
         <button class="add-row" id="add-account-row">${icon('plus')}<span>Add account</span></button>
+        <button class="add-row" id="add-custom-website">${icon('globe')}<span>Add Custom URL</span></button>
         <div class="section-heading capsule-heading"><button class="section-link" id="open-capsule-hub">CAPSULE HUB</button><button class="icon-button small" id="add-capsule" aria-label="Create capsule" title="New capsule">${icon('plus')}</button></div>
         <div id="capsule-list" class="capsule-list"></div>
         <button class="add-row" id="import-capsule">${icon('download')}<span>Import capsule</span></button>
@@ -53,6 +54,7 @@ root.innerHTML = `
     </main>
   </div>
   <dialog class="modal" id="account-dialog"><form id="account-form" method="dialog"><div class="modal-top"><div><div class="modal-kicker">NEW WORKSPACE</div><h2>Add an account</h2></div><button class="icon-button" type="button" data-close aria-label="Close">${icon('close')}</button></div><label class="field-label" for="provider">AI provider</label><select id="provider" name="provider"></select><label class="field-label" for="account-name">Account name</label><input id="account-name" name="name" maxlength="60" placeholder="Personal, Work, Research…" required><p class="form-note">A private browser profile will be created for this account. Sign in directly with your provider; NEXSUS never handles your password.</p><div class="modal-actions"><button class="secondary-button" type="button" data-close>Cancel</button><button class="primary-button" type="submit">Continue</button></div></form></dialog>
+  <dialog class="modal" id="custom-website-dialog"><form id="custom-website-form" method="dialog"><div class="modal-top"><div><div class="modal-kicker">NEW WORKSPACE</div><h2>Add a custom website</h2></div><button class="icon-button" type="button" data-close aria-label="Close">${icon('close')}</button></div><label class="field-label" for="custom-website-name">Website name <span class="muted">optional</span></label><input id="custom-website-name" name="name" maxlength="60" placeholder="Amazon, GitHub, Stack Overflow…"><label class="field-label" for="custom-website-url">HTTPS URL</label><input id="custom-website-url" name="url" type="url" maxlength="2048" placeholder="https://example.com" required><p class="form-note">Each website gets its own private browser session. Custom websites are remote content and do not have provider Capsule support.</p><div class="modal-actions"><button class="secondary-button" type="button" data-close>Cancel</button><button class="primary-button" type="submit">Add Website</button></div></form></dialog>
   <dialog class="modal" id="rename-dialog"><form id="rename-form" method="dialog"><div class="modal-top"><div><div class="modal-kicker">ACCOUNT SETTINGS</div><h2>Rename account</h2></div><button class="icon-button" type="button" data-close aria-label="Close">${icon('close')}</button></div><input type="hidden" name="id"><label class="field-label" for="rename-name">Account name</label><input id="rename-name" name="name" maxlength="60" required><div class="modal-actions"><button class="secondary-button" type="button" data-close>Cancel</button><button class="primary-button" type="submit">Save name</button></div></form></dialog>
   <dialog class="modal" id="account-picker-dialog"><form id="account-picker-form" method="dialog"><div class="modal-top"><div><div class="modal-kicker">CAPSULE INJECTION</div><h2>Inject Capsule</h2></div><button class="icon-button" type="button" data-close aria-label="Close">${icon('close')}</button></div><input type="hidden" name="capsuleId"><div id="inject-preview" class="inject-preview"></div><label class="field-label" for="target-account">Target provider account</label><select id="target-account" name="accountId"></select><p class="form-note">The context will be inserted into the provider composer for your review. NEXSUS will not send it.</p><div class="modal-actions"><button class="secondary-button" type="button" data-close>Cancel</button><button class="primary-button" type="submit">Review & Inject</button></div></form></dialog>
   <dialog class="modal capsule-modal" id="capsule-dialog"><form id="capsule-form" method="dialog"><div class="modal-top"><div><div class="modal-kicker">MANUAL CONTEXT TRANSFER</div><h2 id="capsule-dialog-title">New capsule</h2></div><button class="icon-button" type="button" data-close aria-label="Close">${icon('close')}</button></div><p class="form-note hidden" id="extraction-note">Built from recognizable messages in the visible provider conversation. Review and edit the extracted fields before saving.</p><input type="hidden" name="id"><label class="field-label">Title</label><input name="title" maxlength="120" placeholder="Project or topic" required><label class="field-label">Objective</label><textarea name="objective" rows="2" placeholder="What are you trying to accomplish?"></textarea><label class="field-label">Summary</label><textarea name="summary" rows="4" placeholder="Important context to bring into another conversation"></textarea><label class="field-label">Current state</label><textarea name="currentState" rows="3" placeholder="What is true now? What remains in progress?"></textarea><div class="field-grid"><label><span class="field-label">Decisions</span><textarea name="decisions" rows="3" placeholder="One per line"></textarea></label><label><span class="field-label">Constraints</span><textarea name="constraints" rows="3" placeholder="One per line"></textarea></label><label><span class="field-label">Completed</span><textarea name="completed" rows="3" placeholder="One per line"></textarea></label><label><span class="field-label">Pending</span><textarea name="pending" rows="3" placeholder="One per line"></textarea></label></div><label class="field-label">Next action</label><input name="nextAction" maxlength="1000" placeholder="The most useful next step"><label class="field-label">Technical context · JSON</label><textarea name="technicalContext" rows="3" placeholder='{"runtime":"Node.js"}'></textarea><label class="field-label">Files</label><textarea name="files" rows="2" placeholder="One path per line"></textarea><label class="field-label">Conversation excerpt</label><textarea name="conversationExcerpt" rows="3"></textarea><div class="modal-actions"><button class="secondary-button" type="button" data-close>Cancel</button><button class="primary-button" type="submit" id="capsule-save">Save capsule</button></div></form></dialog>
@@ -105,6 +107,12 @@ window.addEventListener('unhandledrejection', (event) => {
 
 byId('add-account').addEventListener('click', openAccountDialog);
 byId('add-account-row').addEventListener('click', openAccountDialog);
+byId('add-custom-website').addEventListener('click', () => {
+  const form = byId<HTMLFormElement>('custom-website-form');
+  form.reset();
+  showDialog(byId<HTMLDialogElement>('custom-website-dialog'));
+  byId<HTMLInputElement>('custom-website-url').focus();
+});
 byId('welcome-add').addEventListener('click', openAccountDialog);
 byId('add-capsule').addEventListener('click', () => openCapsuleDialog());
 byId('open-capsule-hub').addEventListener('click', openCapsuleHub);
@@ -206,6 +214,21 @@ byId<HTMLFormElement>('account-form').addEventListener('submit', async (event) =
   form.reset();
   await refreshAccounts();
   await activateAccount(account.id);
+});
+
+byId<HTMLFormElement>('custom-website-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const data = new FormData(form);
+  try {
+    const account = await window.nexsus.accounts.createCustomWebsite(String(data.get('name')), String(data.get('url')));
+    byId<HTMLDialogElement>('custom-website-dialog').close();
+    form.reset();
+    await refreshAccounts();
+    await activateAccount(account.id);
+  } catch (error) {
+    notify(error instanceof Error ? error.message : 'Could not add this website.');
+  }
 });
 
 byId<HTMLFormElement>('capsule-form').addEventListener('submit', async (event) => {
@@ -331,9 +354,9 @@ function renderLists(query = ''): void {
   for (const account of filteredAccounts) providers.set(account.providerId, [...(providers.get(account.providerId) ?? []), account]);
   accountList.innerHTML = [...providers.entries()].map(([providerId, group]) => `
     <section class="provider-group"><div class="provider-label"><span class="provider-glyph ${escapeHtml(providerId)}">${providerGlyph(providerId)}</span><span>${escapeHtml(group[0]?.providerName ?? providerId)}</span><span class="account-count">${group.length}</span></div>
-      ${group.map((account) => `<div class="account-row ${activeAccountId === account.id ? 'selected' : ''}" data-account="${escapeHtml(account.id)}"><button class="account-select" aria-pressed="${activeAccountId === account.id}" aria-label="${escapeHtml(`${account.providerName} account ${account.displayName}${activeAccountId === account.id ? ', active' : ''}`)}"><span class="account-status" aria-hidden="true"></span><span class="account-name">${escapeHtml(account.displayName)}</span>${account.isFavorite ? '<span class="favorite-mark" aria-label="Favorite">✦</span>' : ''}</button><button class="row-menu" data-account-menu="${escapeHtml(account.id)}" aria-label="Account options" title="Account options">${icon('more')}</button></div>`).join('')}
+      ${group.map((account) => `<div class="account-row ${activeAccountId === account.id ? 'selected' : ''}" data-account="${escapeHtml(account.id)}"><button class="account-select" aria-pressed="${activeAccountId === account.id}" aria-label="${escapeHtml(`${account.providerName} account ${account.displayName}${activeAccountId === account.id ? ', active' : ''}`)}">${account.faviconDataUrl ? `<img class="account-favicon" src="${escapeHtml(account.faviconDataUrl)}" alt="" aria-hidden="true">` : `<span class="account-status" aria-hidden="true"></span>`}<span class="account-name">${escapeHtml(account.displayName)}</span>${account.isFavorite ? '<span class="favorite-mark" aria-label="Favorite">✦</span>' : ''}</button><button class="row-menu" data-account-menu="${escapeHtml(account.id)}" aria-label="Account options" title="Account options">${icon('more')}</button></div>`).join('')}
     </section>`).join('') || (query ? '<div class="sidebar-empty">No matching accounts</div>' : '');
-  collapsedRail.innerHTML = filteredAccounts.map((account) => `<button class="collapsed-account-icon ${activeAccountId === account.id ? 'selected' : ''}" data-collapsed-account="${escapeHtml(account.id)}" title="${escapeHtml(`${account.providerName} · ${account.displayName}`)}" aria-label="${escapeHtml(`${account.providerName} account ${account.displayName}`)}">${providerGlyph(account.providerId)}</button>`).join('') + `<button class="collapsed-tool" data-collapsed-capsules aria-label="Open Capsule Hub" title="Capsule Hub">${icon('capsule')}</button><button class="collapsed-tool" data-collapsed-settings aria-label="Settings and About" title="Settings & About">${icon('settings')}</button>`;
+  collapsedRail.innerHTML = filteredAccounts.map((account) => `<button class="collapsed-account-icon ${activeAccountId === account.id ? 'selected' : ''}" data-collapsed-account="${escapeHtml(account.id)}" title="${escapeHtml(`${account.providerName} · ${account.displayName}`)}" aria-label="${escapeHtml(`${account.providerName} account ${account.displayName}`)}">${account.faviconDataUrl ? `<img src="${escapeHtml(account.faviconDataUrl)}" alt="">` : providerGlyph(account.providerId)}</button>`).join('') + `<button class="collapsed-tool" data-collapsed-capsules aria-label="Open Capsule Hub" title="Capsule Hub">${icon('capsule')}</button><button class="collapsed-tool" data-collapsed-settings aria-label="Settings and About" title="Settings & About">${icon('settings')}</button>`;
   collapsedRail.querySelectorAll<HTMLButtonElement>('[data-collapsed-account]').forEach((button) => button.addEventListener('click', () => void activateAccount(button.dataset.collapsedAccount ?? '')));
   collapsedRail.querySelector<HTMLButtonElement>('[data-collapsed-capsules]')?.addEventListener('click', openCapsuleHub);
   collapsedRail.querySelector<HTMLButtonElement>('[data-collapsed-settings]')?.addEventListener('click', () => showDialog(byId<HTMLDialogElement>('settings-dialog')));
@@ -356,6 +379,7 @@ function renderLists(query = ''): void {
           notify('Saved session cleared');
         })();
       } },
+      ...(account.type === 'custom' ? [{ label: 'Refresh website icon', action: () => void window.nexsus.accounts.refreshCustomWebsiteIcon(id).then(refreshAccounts) }] : []),
     ];
     showMenu(button, [
       ...menuItems,
@@ -446,10 +470,11 @@ function openCapsule(id: string, selectedVersion?: Capsule): void {
 }
 
 function openInjectDialog(capsule: Capsule): void {
-  if (!accounts.length) return notify('Add an account before injecting a capsule.');
+  const supportedAccounts = accounts.filter((account) => account.type === 'provider' && providerDefinitions.find((provider) => provider.id === account.providerId)?.capabilities.injectCapsule);
+  if (!supportedAccounts.length) return notify('Add a supported provider account before injecting a Capsule.');
   const form = byId<HTMLFormElement>('account-picker-form');
   (form.elements.namedItem('capsuleId') as HTMLInputElement).value = capsule.id;
-  byId<HTMLSelectElement>('target-account').innerHTML = accounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(account.providerName)} · ${escapeHtml(account.displayName)}</option>`).join('');
+  byId<HTMLSelectElement>('target-account').innerHTML = supportedAccounts.map((account) => `<option value="${escapeHtml(account.id)}">${escapeHtml(account.providerName)} · ${escapeHtml(account.displayName)}</option>`).join('');
   byId('inject-preview').innerHTML = `<strong>${escapeHtml(capsule.title)} · v${capsule.version}</strong><span>Approx. ${Math.ceil(capsuleText(capsule).length / 4).toLocaleString()} tokens</span>`;
   showDialog(byId<HTMLDialogElement>('account-picker-dialog'));
 }
@@ -587,7 +612,7 @@ function capsuleSection(title: string, body: string): string {
   return body ? `<section class="document-section"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(body).replaceAll('\n', '<br>')}</p></section>` : '';
 }
 
-function providerGlyph(providerId: string): string { return escapeHtml(providerDefinitions.find((provider) => provider.id === providerId)?.glyph ?? providerId.slice(0, 1).toUpperCase()); }
+function providerGlyph(providerId: string): string { return escapeHtml(providerDefinitions.find((provider) => provider.id === providerId)?.glyph ?? (providerId === 'custom' ? '◎' : providerId.slice(0, 1).toUpperCase())); }
 function lines(value: string): string[] { return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean); }
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -599,7 +624,7 @@ function escapeHtml(value: string): string {
 }
 function icon(name: string): string {
   const paths: Record<string, string> = {
-    'panel-left': '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>', search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>', plus: '<path d="M12 5v14M5 12h14"/>', shield: '<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/>', settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 1.4-3.4 2 2 0 0 0-1.4-3.4 2 2 0 0 0-3.4-1.4 2 2 0 0 0-3.4-1.4 2 2 0 0 0-3.4 1.4 2 2 0 0 0-3.4 1.4 2 2 0 0 0-1.4 3.4 2 2 0 0 0 1.4 3.4 2 2 0 0 0 3.4 1.4 2 2 0 0 0 3.4 1.4 2 2 0 0 0 3.4-1.4 2 2 0 0 0 3.4-1.4Z"/>', capsule: '<path d="m8 4 12 12a4.2 4.2 0 0 1-6 6L2 10a4.2 4.2 0 0 1 6-6Z"/><path d="m6 6 12 12"/>',
+    'panel-left': '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>', globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>', search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>', plus: '<path d="M12 5v14M5 12h14"/>', shield: '<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/>', settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 1.4-3.4 2 2 0 0 0-1.4-3.4 2 2 0 0 0-3.4-1.4 2 2 0 0 0-3.4-1.4 2 2 0 0 0-3.4 1.4 2 2 0 0 0-3.4 1.4 2 2 0 0 0-1.4 3.4 2 2 0 0 0 1.4 3.4 2 2 0 0 0 3.4 1.4 2 2 0 0 0 3.4 1.4 2 2 0 0 0 3.4-1.4 2 2 0 0 0 3.4-1.4Z"/>', capsule: '<path d="m8 4 12 12a4.2 4.2 0 0 1-6 6L2 10a4.2 4.2 0 0 1 6-6Z"/><path d="m6 6 12 12"/>',
     back: '<path d="m15 18-6-6 6-6"/>', forward: '<path d="m9 18 6-6-6-6"/>', reload: '<path d="M20 7v5h-5M4 17v-5h5M5.5 9a7 7 0 0 1 11.6-2.6L20 12M4 12l2.9 5.6A7 7 0 0 0 18.5 15"/>', stop: '<path d="M7 7h10v10H7z"/>', lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/>', external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/>', close: '<path d="m18 6-12 12M6 6l12 12"/>', more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>', file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>', download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>', copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>', 'arrow-up': '<path d="M12 19V5m-7 7 7-7 7 7"/>',
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? ''}</svg>`;

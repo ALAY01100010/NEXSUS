@@ -59,6 +59,8 @@ describe('local metadata store', () => {
     let store = new LocalStore(new DatabaseSync(databasePath));
     const account = store.createAccount('claude', 'Research');
     store.setAccountLastUrl(account.id, 'https://claude.ai/new');
+    const custom = store.createCustomWebsite('GitHub', 'https://github.com/');
+    store.setCustomWebsiteFavicon(custom.id, 'data:image/png;base64,iVBORw0KGgo=');
     const capsule = store.createCapsule({
       title: 'Project notes', objective: 'Ship the feature', summary: 'Use an isolated profile.',
       decisions: ['SQLite metadata'], constraints: ['Local only'], completed: ['Foundation'], pending: ['Browser view'], nextAction: 'Add WebContentsView',
@@ -69,6 +71,10 @@ describe('local metadata store', () => {
     store = new LocalStore(new DatabaseSync(databasePath));
     assert.equal(store.listAccounts()[0].id, account.id);
     assert.equal(store.listAccounts()[0].lastUrl, 'https://claude.ai/new');
+    const restoredCustom = store.listAccounts().find((item) => item.id === custom.id);
+    assert.equal(restoredCustom?.customUrl, 'https://github.com/');
+    assert.equal(restoredCustom?.faviconDataUrl, 'data:image/png;base64,iVBORw0KGgo=');
+    assert.ok(restoredCustom?.updatedAt);
     assert.equal(store.getCapsule(capsule.id)?.nextAction, 'Add WebContentsView');
     assert.deepEqual(store.getCapsule(capsule.id)?.technicalContext, { runtime: 'Node.js', heading: '## Heading' });
     assert.deepEqual(store.getCapsule(capsule.id)?.files, ['src/main.ts']);
@@ -91,8 +97,9 @@ describe('local metadata store', () => {
       CREATE TABLE capsules (id TEXT PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '', decisions_json TEXT NOT NULL DEFAULT '[]', constraints_json TEXT NOT NULL DEFAULT '[]', completed_json TEXT NOT NULL DEFAULT '[]', pending_json TEXT NOT NULL DEFAULT '[]', next_action TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE workspace_state (key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA user_version = 1;`);
     const store = new LocalStore(db);
-    assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
+    assert.equal(db.prepare('PRAGMA user_version').get().user_version, 5);
     assert.ok(db.prepare('PRAGMA table_info(accounts)').all().some((column) => column.name === 'last_url'));
+    assert.ok(db.prepare('PRAGMA table_info(accounts)').all().some((column) => column.name === 'updated_at'));
     assert.ok(db.prepare('PRAGMA table_info(capsules)').all().some((column) => column.name === 'technical_context_json'));
     assert.ok(db.prepare('PRAGMA table_info(capsules)').all().some((column) => column.name === 'version_group_id'));
     assert.ok(db.prepare('PRAGMA table_info(capsules)').all().some((column) => column.name === 'current_state'));
@@ -107,6 +114,38 @@ describe('local metadata store', () => {
     store.setAccountFavorite(personal.id, true);
     store.moveAccount(research.id, -1);
     assert.deepEqual(store.listAccounts().map((account) => account.displayName), ['Personal', 'Research', 'Work']);
+    store.close();
+  });
+
+  it('creates independent persistent custom websites, caches their icon, renames, and deletes them', () => {
+    const store = new LocalStore(new DatabaseSync(':memory:'));
+    const first = store.createCustomWebsite('', 'https://amazon.in/');
+    const second = store.createCustomWebsite('Amazon Work', 'https://amazon.in');
+    assert.equal(first.type, 'custom');
+    assert.equal(first.customUrl, 'https://amazon.in/');
+    assert.equal(first.displayName, 'Amazon — Account 1');
+    assert.equal(first.updatedAt, first.createdAt);
+    assert.equal(second.displayName, 'Amazon Work — Account 2');
+    assert.match(store.getAccountSessionPartition(first.id), new RegExp(`persist:nexsus-custom-${first.id}`));
+    assert.notEqual(store.getAccountSessionPartition(first.id), store.getAccountSessionPartition(second.id));
+    store.setCustomWebsiteFavicon(first.id, 'data:image/png;base64,iVBORw0KGgo=');
+    const renamed = store.renameAccount(second.id, 'Work');
+    assert.equal(renamed.displayName, 'Work');
+    assert.ok(renamed.updatedAt >= renamed.createdAt);
+    assert.equal(store.listAccounts().find((item) => item.id === first.id)?.faviconDataUrl, 'data:image/png;base64,iVBORw0KGgo=');
+    store.removeAccount(first.id);
+    assert.deepEqual(store.listAccounts().map((item) => item.id), [second.id]);
+    assert.throws(() => store.createCustomWebsite('', 'javascript:alert(1)'), /HTTPS/);
+    assert.throws(() => store.setCustomWebsiteFavicon(second.id, 'data:image/svg+xml;base64,PHN2Zy8+'), /icon is invalid/);
+    store.close();
+  });
+
+  it('keeps provider account metadata compatible with the custom account schema', () => {
+    const store = new LocalStore(new DatabaseSync(':memory:'));
+    const account = store.createAccount('claude', 'Personal');
+    assert.equal(account.type, 'provider');
+    assert.equal(account.customUrl, null);
+    assert.equal(account.faviconDataUrl, null);
     store.close();
   });
 

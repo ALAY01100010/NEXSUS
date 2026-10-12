@@ -8,6 +8,8 @@ const accounts = Object.fromEntries(providerIds.flatMap((providerId, index) => [
   [`${providerId}-A`, `persist:nexsus-account-${String(index * 2 + 1).padStart(8, '0')}-1111-4111-8111-${String(index * 2 + 1).padStart(12, '0')}`],
   [`${providerId}-B`, `persist:nexsus-account-${String(index * 2 + 2).padStart(8, '0')}-2222-4222-8222-${String(index * 2 + 2).padStart(12, '0')}`],
 ]));
+accounts['custom-A'] = 'persist:nexsus-custom-aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+accounts['custom-B'] = 'persist:nexsus-custom-bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
 
 app.setPath('userData', process.env.NEXSUS_TEST_USER_DATA);
 app.setPath('sessionData', process.env.NEXSUS_TEST_SESSION_DATA);

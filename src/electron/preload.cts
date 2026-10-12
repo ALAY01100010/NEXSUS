@@ -8,6 +8,8 @@ const api: NexsusApi = {
   accounts: {
     list: () => ipcRenderer.invoke('accounts:list'),
     create: (providerId, displayName) => ipcRenderer.invoke('accounts:create', providerId, displayName),
+    createCustomWebsite: (name, url) => ipcRenderer.invoke('custom-websites:create', name, url),
+    refreshCustomWebsiteIcon: (id) => ipcRenderer.invoke('custom-websites:refresh-icon', id),
     rename: (id, displayName) => ipcRenderer.invoke('accounts:rename', id, displayName),
     remove: (id) => ipcRenderer.invoke('accounts:remove', id),
     activate: (id) => ipcRenderer.invoke('accounts:activate', id),
